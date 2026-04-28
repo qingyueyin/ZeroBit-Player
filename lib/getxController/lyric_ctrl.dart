@@ -151,9 +151,13 @@ class LyricController extends GetxController {
       }
 
       if ((_audioController.currentLyrics.value?.type ?? LyricFormat.lrc) ==
-              LyricFormat.lrc ||
-          currentLineIndex.value < 0 ||
-          _currentLine == null) {
+          LyricFormat.lrc) {
+        _updateInterludeState();
+        return;
+      }
+      // 确保所有分支都调用，避免切换歌曲等场景间奏状态残留
+      if (currentLineIndex.value < 0 || _currentLine == null) {
+        _updateInterludeState();
         return;
       }
       final newWordIndex = _findLrcPos(
