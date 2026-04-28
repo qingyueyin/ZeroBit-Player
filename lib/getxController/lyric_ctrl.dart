@@ -106,15 +106,38 @@ class LyricController extends GetxController {
 
   // 判断是否显示间奏
   void _updateInterludeState() {
+    final lyrics = _audioController.currentLyrics.value;
+    if (lyrics == null ||
+        lyrics.parsedLrc == null ||
+        lyrics.parsedLrc!.isEmpty) {
+      showInterlude.value = false;
+      return;
+    }
+
+    // 场景1: 当前时间还没到第一句歌词（前奏或第一段间奏）
+    if (currentLineIndex.value < 0) {
+      final firstLineStart = lyrics.parsedLrc![0].start;
+      final timeToFirst = firstLineStart - currentMs20.value;
+      showInterlude.value =
+          timeToFirst > 4 &&
+          timeToFirst <
+              60000; // 超过1分钟认为歌词时间轴有误
+      if (showInterlude.value) {
+        interludeProcess.value = ((currentMs20.value / firstLineStart) * 100)
+            .clamp(0.0, 95.0);
+      }
+      return;
+    }
+
+    // 场景2: 当前行的最后一个词已播放完毕，等待下一行歌词
     final isLast = currentWordIndex.value == _wordsLen - 1;
     if (!isLast) {
       showInterlude.value = false;
       return;
     }
-    final int len =
-        (_audioController.currentLyrics.value?.parsedLrc?.length ?? 0) - 1;
+    final int len = lyrics.parsedLrc!.length - 1;
     int threshold = _lowIntervalThreshold;
-    if (_audioController.currentLyrics.value?.type == LyricFormat.byWordLrc) {
+    if (lyrics.type == LyricFormat.byWordLrc) {
       threshold = -8; // 我也忘了这里为什么是 -8 了
     }
     showInterlude.value =
