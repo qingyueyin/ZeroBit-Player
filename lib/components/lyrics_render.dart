@@ -49,6 +49,8 @@ const _lrcWrapAlignment = [
 const List<double> _gradientStops = [0.0, 0.333, 0.666];
 const _lrcScale = 1.1;
 
+double _translateGradientScale = 2;
+
 class _LyricsStyle {
   final SettingController _settingController = Get.find<SettingController>();
   ThemeService get _themeService => Get.find<ThemeService>();
@@ -90,14 +92,12 @@ class _HighlightedWord extends StatelessWidget {
   final double progress;
   final TextStyle style;
   final StrutStyle strutStyle;
-  final double scale;
   final List<Color> gradientColors;
   const _HighlightedWord({
     required this.text,
     required this.progress,
     required this.style,
     required this.strutStyle,
-    required this.scale,
     required this.gradientColors,
   });
 
@@ -115,7 +115,7 @@ class _HighlightedWord extends StatelessWidget {
           end: Alignment.centerRight,
           colors: gradientColors,
           stops: _gradientStops,
-          transform: _ScaledTranslateGradientTransform(dx: dx, scale: scale),
+          transform: _ScaledTranslateGradientTransform(dx: dx),
         ).createShader(bounds);
       },
       blendMode: BlendMode.dstIn,
@@ -132,17 +132,13 @@ class _HighlightedWord extends StatelessWidget {
 
 class _ScaledTranslateGradientTransform extends GradientTransform {
   final double dx;
-  final double scale;
-  const _ScaledTranslateGradientTransform({
-    required this.dx,
-    required this.scale,
-  });
+  const _ScaledTranslateGradientTransform({required this.dx});
   @override
   Matrix4? transform(Rect bounds, {TextDirection? textDirection}) {
     // final double scale=entry.value.duration>=1.0 ? 3:2; 动态 scale 视觉效果更好
     // 先将x轴扩大scale倍，然后平移x轴
     return Matrix4.identity()
-      ..scale(scale, 1.0, 1.0)
+      ..scale(_translateGradientScale, 1.0, 1.0)
       ..translate(dx, 0.0, 0.0);
   }
 }
@@ -223,7 +219,7 @@ class _KaraOkLyricWidget extends StatelessWidget {
               text.asMap().entries.map((entry) {
                 final wordIndex = entry.key;
                 final word = entry.value.lyricWord;
-                final double scale = entry.value.duration >= 1.0 ? 3 : 2;
+                _translateGradientScale = entry.value.duration >= 1.0 ? 3 : 2;
 
                 if (wordIndex == currWordIndex) {
                   final List<Color> gradientColors = [
@@ -244,7 +240,6 @@ class _KaraOkLyricWidget extends StatelessWidget {
                       progress: lyricController.wordProgress.value,
                       style: style,
                       strutStyle: strutStyle,
-                      scale: scale,
                       gradientColors: gradientColors,
                     ),
                   );
@@ -762,14 +757,13 @@ class _InterludeWidget extends StatelessWidget {
                   mainAxisAlignment: _lrcMainAlignment[lrcAlignment],
                   children: [
                     RepaintBoundary(
-                      child: Obx(
-                            () => _HighlightedWord(
+                      child: Obx(() {
+                            _translateGradientScale = 2;
+                            return _HighlightedWord(
                               text: "  ● ● ●  ",
-                              progress:
-                                  lyricController.interludeProcess.value,
+                              progress: lyricController.interludeProcess.value,
                               style: interludeLyricStyle,
                               strutStyle: strutStyle,
-                              scale: 2,
                               gradientColors: [
                                 interludeLyricStyle.color!.withValues(
                                   alpha: _highLightAlpha,
@@ -779,8 +773,8 @@ class _InterludeWidget extends StatelessWidget {
                                 ),
                                 interludeLyricStyle.color!,
                               ],
-                            ),
-                          )
+                            );
+                          })
                           .animate(
                             onPlay:
                                 (controller) =>

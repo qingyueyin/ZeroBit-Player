@@ -72,14 +72,10 @@ class AudioCtrlWidget {
   final double size;
   final BuildContext context;
   final Color? color;
-  AudioCtrlWidget({
-    required this.size,
-    required this.context,
-    this.color,
-  });
+  AudioCtrlWidget({required this.size, required this.context, this.color});
 
   final AudioController _audioController = Get.find<AudioController>();
-final SettingController _settingController = Get.find<SettingController>();
+  final SettingController _settingController = Get.find<SettingController>();
 
   Widget get speedSet {
     const double btnW = 72;
@@ -91,16 +87,22 @@ final SettingController _settingController = Get.find<SettingController>();
           return CustomBtn(
             fn: () async {
               await setSpeed(speed: speed);
-              _audioController.currentSpeed.value=speed;
+              _audioController.currentSpeed.value = speed;
               menuController.close();
             },
             btnWidth: btnW,
             btnHeight: setBtnHeight,
             label: speed.toString(),
-            icon: _audioController.currentSpeed.value!=speed? null: PhosphorIconsLight.check,
+            icon:
+                _audioController.currentSpeed.value != speed
+                    ? null
+                    : PhosphorIconsLight.check,
             iconSize: 'xs',
             contentColor: Theme.of(context).colorScheme.onSecondaryContainer,
-            mainAxisAlignment: _audioController.currentSpeed.value!=speed? MainAxisAlignment.end : MainAxisAlignment.spaceBetween,
+            mainAxisAlignment:
+                _audioController.currentSpeed.value != speed
+                    ? MainAxisAlignment.end
+                    : MainAxisAlignment.spaceBetween,
             spacing: 0,
             padding: EdgeInsets.symmetric(horizontal: 12),
             backgroundColor: Colors.transparent,
@@ -299,11 +301,11 @@ final SettingController _settingController = Get.find<SettingController>();
     final equalizerSliders =
         SettingController.equalizerFCenters.indexed.map((v) {
           return SizedBox(
-            width: 48,
+            width: 52,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.center,
-              spacing: 8,
+              spacing: 6,
               children: [
                 Obx(
                   () => Text(
@@ -395,8 +397,10 @@ final SettingController _settingController = Get.find<SettingController>();
                             SettingController.equalizerGainPresets.entries.map((
                               entry,
                             ) {
-                              return Obx(
-                                () => CustomBtn(
+                              return Obx(() {
+                                final equalizerGains =
+                                    _settingController.equalizerGains;
+                                return CustomBtn(
                                   fn: () async {
                                     _settingController.equalizerGains.value =
                                         entry.value;
@@ -412,8 +416,7 @@ final SettingController _settingController = Get.find<SettingController>();
                                       SettingController
                                           .equalizerGainPresetsText[entry.key],
                                   backgroundColor:
-                                      _settingController.equalizerGains ==
-                                              entry.value
+                                      equalizerGains == entry.value
                                           ? Theme.of(
                                             context,
                                           ).colorScheme.primary
@@ -422,8 +425,7 @@ final SettingController _settingController = Get.find<SettingController>();
                                               .secondaryContainer
                                               .withValues(alpha: 0.2),
                                   contentColor:
-                                      _settingController.equalizerGains ==
-                                              entry.value
+                                      equalizerGains == entry.value
                                           ? Theme.of(
                                             context,
                                           ).colorScheme.onPrimary
@@ -432,8 +434,8 @@ final SettingController _settingController = Get.find<SettingController>();
                                           ).colorScheme.primary,
                                   btnWidth: 96,
                                   btnHeight: 36,
-                                ),
-                              );
+                                );
+                              });
                             }).toList(),
                       ),
                       Expanded(

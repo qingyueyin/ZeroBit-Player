@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -49,50 +48,6 @@ final _coverViewMode = 0.obs;
 const double _menuBtnWidth = 180;
 const double _menuBtnHeight = 48;
 const double _menuBtnRadius = 0;
-
-// --- 频谱图控制器 ---
-class _SpectrogramController extends GetxController {
-  Timer? _spectrogramAnimationTimer;
-  final AudioController _audioController = Get.find<AudioController>();
-  final SettingController _settingController = Get.find<SettingController>();
-
-  @override
-  void onClose() {
-    _cancelSpectrogramAnimationTimer();
-    super.onClose();
-  }
-
-  @override
-  void onInit() {
-    super.onInit();
-    if (_settingController.showSpectrogram.value) {
-      _startSpectrogramAnimationTimer();
-    }
-  }
-
-  void _cancelSpectrogramAnimationTimer() {
-    _spectrogramAnimationTimer?.cancel();
-    _spectrogramAnimationTimer = null;
-  }
-
-  void _startSpectrogramAnimationTimer() {
-    _cancelSpectrogramAnimationTimer();
-    _spectrogramAnimationTimer = Timer.periodic(Duration(milliseconds: 16), (
-      Timer timer,
-    ) {
-      // 约 60 fps
-      _audioController.getAudioFFt();
-    });
-  }
-
-  void toggleSpectrogramVisibility() {
-    if (_settingController.showSpectrogram.value) {
-      _startSpectrogramAnimationTimer();
-    } else {
-      _cancelSpectrogramAnimationTimer();
-    }
-  }
-}
 
 // --- 歌词搜索控制器 ---
 class _LrcSearchController extends GetxController {
@@ -676,9 +631,6 @@ class LrcView extends StatelessWidget {
     TextStyle timeCurrentStyle,
     TextStyle timeTotalStyle,
   ) {
-    final _SpectrogramController spectrogramController = Get.put(
-      _SpectrogramController(),
-    );
     final audioCtrlWidget = AudioCtrlWidget(
       context: context,
       size: _ctrlBtnMinSize,
@@ -971,8 +923,6 @@ class LrcView extends StatelessWidget {
                             fn: () {
                               _settingController.showSpectrogram.toggle();
                               _settingController.putScalableCache();
-                              spectrogramController
-                                  .toggleSpectrogramVisibility();
                             },
                           ),
                         ),
@@ -1374,40 +1324,19 @@ class LrcView extends StatelessWidget {
                                 left: 0,
                                 bottom: 0,
                                 child: Obx(() {
-                                  final fftList = [
-                                    ..._audioController.audioFFT,
-                                  ];
-                                  if (fftList.isEmpty ||
-                                      !settingController
-                                          .showSpectrogram
-                                          .value) {
+                                  if (!settingController
+                                      .showSpectrogram
+                                      .value) {
                                     return const SizedBox.shrink();
                                   }
-                                  return TweenAnimationBuilder<List<double>>(
-                                    tween: _FFTListTween(
-                                      begin: fftList,
-                                      end: fftList,
+                                  return _SpectrogramWidget(
+                                    key: ValueKey(
+                                      _settingController.showSpectrogram.value,
                                     ),
-                                    duration: const Duration(milliseconds: 100),
-                                    builder: (_, value, _) {
-                                      return RepaintBoundary(
-                                        child: CustomPaint(
-                                          willChange: true,
-                                          size: Size(
-                                            context.width,
-                                            _spectrogramHeight,
-                                          ),
-                                          painter: SpectrogramPainter(
-                                            fft: value,
-                                            gradient: spectrogramBarGradient,
-                                            length: spectrogramBarLength,
-                                            barWidth: spectrogramBarWidth,
-                                            paddingWidth:
-                                                spectrogramPaddingWidth,
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                    gradient: spectrogramBarGradient,
+                                    lenth: spectrogramBarLength,
+                                    barWidth: spectrogramBarWidth,
+                                    paddingWidth: spectrogramPaddingWidth,
                                   );
                                 }),
                               ),
@@ -1439,79 +1368,214 @@ class LrcView extends StatelessWidget {
   }
 }
 
-/// 绘制频谱图
-class SpectrogramPainter extends CustomPainter {
-  final List<double> fft;
+class _SpectrogramWidget extends StatefulWidget {
   final LinearGradient gradient;
-  final double length;
+  final double lenth;
   final double barWidth;
   final double paddingWidth;
-
-  SpectrogramPainter({
-    required this.fft,
+  const _SpectrogramWidget({
+    super.key,
     required this.gradient,
-    required this.length,
+    required this.lenth,
     required this.barWidth,
     required this.paddingWidth,
   });
 
-  final _paint = Paint()..style = PaintingStyle.fill;
-
   @override
-  void paint(Canvas canvas, Size size) {
-    if (fft.isEmpty) {
-      return;
-    }
-
-    int n = 0;
-    for (final data in fft) {
-      if (n > length) {
-        return;
-      }
-
-      final height = data * _spectrogramHeight;
-      final rect = Rect.fromLTWH(
-        n * barWidth + paddingWidth,
-        _spectrogramHeight - height,
-        barWidth * 0.5,
-        height,
-      );
-      canvas.drawRect(rect, _paint..shader = gradient.createShader(rect));
-      n++;
-    }
-  }
-
-  @override
-  bool shouldRepaint(SpectrogramPainter oldDelegate) {
-    return !listEquals(oldDelegate.fft, fft); // 如果不需要重绘，返回false
-  }
+  State<_SpectrogramWidget> createState() => _SpectrogramWidgetState();
 }
 
-/// 对 audioFFT `List<double>` 的自定义Tween
-class _FFTListTween extends Tween<List<double>> {
-  _FFTListTween({required super.begin, required super.end});
+class _SpectrogramWidgetState extends State<_SpectrogramWidget>
+    with SingleTickerProviderStateMixin {
+  final AudioController _audioController = Get.find<AudioController>();
+
+  // 颜色缓存，颜色变化的时候更新painter
+  Color? _cachedColor;
+
+  // 驱动补间插值动画
+  late AnimationController _animController;
+
+  /// 插值起点：动画开始时各柱子的高度
+  List<double> _currentFFT = [];
+
+  /// 插值终点：最新一帧从后端拉取的 FFT 数据
+  List<double> _targetFFT = [];
+
+  /// 当前实际渲染的值：_currentFFT 到 _targetFFT 之间插值的结果
+  List<double> _displayFFT = [];
+
+  /// 缓存的 Shader，尺寸不变时复用，避免每帧重建
+  Shader? _cachedShader;
+  Size _lastSize = Size.zero;
+
+  Worker? _fftWorker;
+
+  /// 防止 dispose 后异步回调仍然执行的保护标志
+  bool _isDisposed = false;
+
+  /// 定时从后端拉取 FFT 数据
+  /// 不用 Ticker（每帧触发）是因为音频数据不需要和屏幕刷新率同步
+  /// 视觉流畅度由 _animController 的插值保证，而非拉取频率
+  Timer? _fetchTimer;
 
   @override
-  List<double> lerp(double t) {
-    if (begin == null || end == null) {
-      return [];
-    }
+  void initState() {
+    super.initState();
 
-    // 防止 index out range
-    final l = begin!.length <= end!.length ? begin!.length : end!.length;
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 100),
+    );
+    _animController.addListener(_onAnimationTick);
 
-    return List.generate(l, (index) {
-      return lerpDouble(begin![index], end![index], t)!;
+    // 监听 audioFFT 变化，后端数据更新时触发 _onFFTUpdated
+    _fftWorker = ever(_audioController.audioFFT, _onFFTUpdated);
+
+    // 每50ms更新一次数据就已经足够，更新间隔为过渡时间(100ms)的一半
+    _fetchTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      _audioController.getAudioFFt();
     });
   }
 
-  // 辅助函数，用于 double 类型的线性插值
-  double? lerpDouble(double? a, double? b, double t) {
-    if (a == null && b == null) {
-      return null;
+  @override
+  void dispose() {
+    _isDisposed = true;
+    // 先取消监听，再 dispose controller
+    // 顺序重要：防止 cancel 期间还有回调触发
+    _fftWorker?.dispose();
+    _fetchTimer?.cancel();
+    _animController.dispose();
+    super.dispose();
+  }
+
+  /// 收到新 FFT 数据时，记录插值起点和终点，启动补间动画
+  void _onFFTUpdated(List<double> newFFT) {
+    if (_isDisposed || !mounted) return;
+
+    // 以当前渲染值作为起点，避免动画跳变
+    // 首帧 _displayFFT 为空时直接用新数据初始化
+    _currentFFT = List<double>.from(_displayFFT.isEmpty ? newFFT : _displayFFT);
+    _targetFFT = newFFT;
+
+    // 每次数据更新都重新平滑过渡
+    _animController.forward(from: 0);
+  }
+
+  /// AnimationController 每个动画帧回调，计算当前插值结果写入 _displayFFT
+  void _onAnimationTick() {
+    if (_isDisposed || !mounted || _targetFFT.isEmpty) return;
+    final t = _animController.value; // 当前动画进度 0.0 ~ 1.0
+    final len =
+        _currentFFT.length <= _targetFFT.length
+            ? _currentFFT.length
+            : _targetFFT.length;
+
+    // 长度变化时才重新分配，正常情况下复用同一个 List
+    if (_displayFFT.length != len) {
+      _displayFFT = List<double>.filled(len, 0.0);
     }
-    a ??= 0.0;
-    b ??= 0.0;
-    return a + (b - a) * t;
+
+    // 线性插值
+    for (int i = 0; i < len; i++) {
+      _displayFFT[i] = _currentFFT[i] + (_targetFFT[i] - _currentFFT[i]) * t;
+    }
+  }
+
+  /// 获取或创建 Shader，尺寸与颜色不变时直接返回缓存
+  /// createShader 有一定开销，避免每帧调用
+  Shader _getShader(Size size) {
+    if (_cachedShader == null ||
+        _cachedColor == null ||
+        size != _lastSize ||
+        widget.gradient.colors[0] != _cachedColor) {
+      _lastSize = size;
+      _cachedColor = widget.gradient.colors[0];
+      _cachedShader = widget.gradient.createShader(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+      );
+    }
+    return _cachedShader!;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _animController,
+        builder: (_, __) {
+          if (_displayFFT.isEmpty) return const SizedBox.shrink();
+          final size = Size(
+            MediaQuery.of(context).size.width,
+            _spectrogramHeight,
+          );
+          return CustomPaint(
+            size: size,
+            painter: _SpectrogramPainter(
+              fft: _displayFFT,
+              shader: _getShader(size),
+              length: widget.lenth,
+              barWidth: widget.barWidth,
+              paddingWidth: widget.paddingWidth,
+              // 用动画进度值作为 shouldRepaint 的判断依据
+              version: _animController.value,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SpectrogramPainter extends CustomPainter {
+  final List<double> fft;
+  final Shader shader;
+  final double length;
+  final double barWidth;
+  final double paddingWidth;
+  final double version;
+
+  _SpectrogramPainter({
+    required this.fft,
+    required this.shader,
+    required this.length,
+    required this.barWidth,
+    required this.paddingWidth,
+    required this.version,
+  });
+
+  /// 静态复用，避免每次 paint 创建新的 Paint 对象
+  static final _paint = Paint()..style = PaintingStyle.fill;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (fft.isEmpty) return;
+
+    // Shader 在整个频谱图范围内统一设置一次
+    // 所有柱子共享同一个 shader，而不是每根柱子单独 createShader
+    _paint.shader = shader;
+
+    final maxBars = length.toInt();
+    final count = fft.length < maxBars ? fft.length : maxBars;
+
+    for (int i = 0; i < count; i++) {
+      final height = fft[i] * _spectrogramHeight;
+      if (height < 0.5) continue;
+
+      canvas.drawRect(
+        Rect.fromLTWH(
+          i * barWidth + paddingWidth,
+          _spectrogramHeight - height,
+          barWidth * 0.5,
+          height,
+        ),
+        _paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SpectrogramPainter old) {
+    // version 是动画进度值，每帧都不同，判断是否需要重绘
+    return old.version != version || old.shader != shader;
   }
 }
