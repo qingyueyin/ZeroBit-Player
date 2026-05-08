@@ -256,40 +256,45 @@ class AudioCtrlWidget {
     ),
   );
 
-  Widget get seekSlide => Obx(() {
-    late final double duration;
-    if (_audioController.currentMetadata.value.path.isNotEmpty) {
-      duration = _audioController.currentDuration.value;
-    } else {
-      _seekDraggingValue.value = 0.0;
-      duration = 9999.0;
-    }
-    return Slider(
-      min: 0.0,
-      max: duration,
-      label:
-          _isSeekBarDragging.value
-              ? formatTime(totalSeconds: _seekDraggingValue.value)
-              : '√',
-      value:
-          _isSeekBarDragging.value
-              ? _seekDraggingValue.value
-              : _audioController.currentMs100.value,
-      onChangeStart: (v) {
-        _seekDraggingValue.value = v;
-        _isSeekBarDragging.value = true;
-      },
-      onChanged: (v) {
-        _seekDraggingValue.value = v;
-      },
-      onChangeEnd: (v) {
-        _audioController.currentMs100.value = v;
-        _isSeekBarDragging.value = false;
-        _audioController.audioSetPositon(pos: v);
+  Widget get seekSlide => Focus(
+    // 禁止键盘事件聚焦
+    canRequestFocus: false,
+    descendantsAreFocusable: false,
+    child: Obx(() {
+      late final double duration;
+      if (_audioController.currentMetadata.value.path.isNotEmpty) {
+        duration = _audioController.currentDuration.value;
+      } else {
         _seekDraggingValue.value = 0.0;
-      },
-    );
-  });
+        duration = 9999.0;
+      }
+      return Slider(
+        min: 0.0,
+        max: duration,
+        label:
+            _isSeekBarDragging.value
+                ? formatTime(totalSeconds: _seekDraggingValue.value)
+                : '√',
+        value:
+            _isSeekBarDragging.value
+                ? _seekDraggingValue.value
+                : _audioController.currentMs100.value,
+        onChangeStart: (v) {
+          _seekDraggingValue.value = v;
+          _isSeekBarDragging.value = true;
+        },
+        onChanged: (v) {
+          _seekDraggingValue.value = v;
+        },
+        onChangeEnd: (v) {
+          _audioController.currentMs100.value = v;
+          _isSeekBarDragging.value = false;
+          _audioController.audioSetPositon(pos: v);
+          _seekDraggingValue.value = 0.0;
+        },
+      );
+    }),
+  );
 
   Widget get equalizerSet {
     final fontStyle = generalTextStyle(

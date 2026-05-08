@@ -428,26 +428,30 @@ class _LyricsRenderState extends State<LyricsRender> {
                         return creatLyricItem(index);
                       },
                     )
-                    : ScrollablePositionedList.builder(
-                      itemCount: parsedLrc.length,
-                      initialScrollIndex: 0,
-                      initialAlignment: 0.4,
-                      itemScrollController:
-                          _lyricController.lrcViewScrollController,
-                      minCacheExtent: 48.0,
-                      addAutomaticKeepAlives: false,
-                      addSemanticIndexes: false,
-                      addRepaintBoundaries: true,
-                      padding: EdgeInsets.symmetric(
-                        vertical:
-                            (context.height -
-                                _audioCtrlBarHeight -
-                                _controllerBarHeight) /
-                            2,
+                    : Focus(
+                      canRequestFocus: false,
+                      descendantsAreFocusable: false,
+                      child: ScrollablePositionedList.builder(
+                        itemCount: parsedLrc.length,
+                        initialScrollIndex: 0,
+                        initialAlignment: 0.4,
+                        itemScrollController:
+                            _lyricController.lrcViewScrollController,
+                        minCacheExtent: 48.0,
+                        addAutomaticKeepAlives: false,
+                        addSemanticIndexes: false,
+                        addRepaintBoundaries: true,
+                        padding: EdgeInsets.symmetric(
+                          vertical:
+                              (context.height -
+                                  _audioCtrlBarHeight -
+                                  _controllerBarHeight) /
+                              2,
+                        ),
+                        itemBuilder: (BuildContext context, int index) {
+                          return creatLyricItem(index);
+                        },
                       ),
-                      itemBuilder: (BuildContext context, int index) {
-                        return creatLyricItem(index);
-                      },
                     );
               }),
             ),
