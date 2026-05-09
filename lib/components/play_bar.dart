@@ -336,20 +336,33 @@ class PlayBar extends GetView<AudioController> {
   }
 
   // 构建时间显示
-  Widget _buildTimeDisplay(AudioController c,TextStyle timeTextStyle) {
-    return SizedBox(
-      height: _barHeight/2,
-      width: 72,
-      child: RepaintBoundary(child: Center(child: Obx(() {
-      final duration =
-          c.currentDuration.value > 0
+  Widget _buildTimeDisplay(AudioController c, TextStyle timeTextStyle) {
+  // 用最长的可能字符串测量宽度
+  final maxText = "00:00 / 00:00";
+  final tp = TextPainter(
+    text: TextSpan(text: maxText, style: timeTextStyle),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  final maxWidth = tp.width + 4; // 留出余量防止误差
+
+  return SizedBox(
+    height: _barHeight / 2,
+    width: maxWidth,
+    child: RepaintBoundary(
+      child: Center(
+        child: Obx(() {
+          final duration = c.currentDuration.value > 0
               ? formatTime(totalSeconds: c.currentDuration.value)
               : "--:--";
-      final currentSec = formatTime(
-        totalSeconds: c.currentSec.value,
-      );
-      return Text("$currentSec / $duration", style: timeTextStyle);
-    }),),),);
-  }
+          final currentSec = formatTime(totalSeconds: c.currentSec.value);
+          return Text(
+            "$currentSec / $duration",
+            style: timeTextStyle,
+          );
+        }),
+      ),
+    ),
+  );
+}
 }
 
