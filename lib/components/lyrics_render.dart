@@ -655,16 +655,25 @@ class _StaggeredLyricItem extends StatelessWidget {
         ],
       );
 
-      double targetSigma = 0.0;
-      if (!isPointerScrolling &&
-          !isCurrent &&
-          settingController.useBlur.value) {
-        int diff = (lyricController.currentLineIndex.value - index).abs();
-        if (diff > 10) {
-          targetSigma = 0.0;
-        } else {
-          targetSigma = diff.clamp(0.0, 4.0).toDouble();
-        }
+      final bool useBlur = settingController.useBlur.value;
+      final int diff =
+          (lyricController.currentLineIndex.value - index).abs(); // 视距
+
+      // 是否需要挂载 ImageFiltered (当前行保持挂载防动画中断，其余行在视距内且未滚动时挂载)
+      final bool applyFilter =
+          useBlur && (isCurrent || (!isPointerScrolling && diff <= 10));
+
+      Widget finalContent = content;
+
+      if (applyFilter) {
+        // 当前行模糊度为 0，其余行根据距离取 1~4
+        final double targetSigma =
+            isCurrent ? 0.0 : diff.clamp(0, 4).toDouble();
+
+        finalContent = ImageFiltered(
+          imageFilter: _getBlurFilter(targetSigma), // 取缓存的ImageFilter
+          child: content,
+        );
       }
 
       return TextButton(
@@ -676,20 +685,25 @@ class _StaggeredLyricItem extends StatelessWidget {
           padding: lrcPadding,
           overlayColor: hoverColor,
         ),
-        child:
-            settingController.useBlur.value
-                ? ImageFiltered(
-                  imageFilter: ui.ImageFilter.blur(
-                    sigmaX: targetSigma,
-                    sigmaY: targetSigma,
-                    tileMode: TileMode.decal,
-                  ),
-                  child: RepaintBoundary(child: content),
-                )
-                : content,
+        child: finalContent,
       );
     });
   }
+}
+
+// 将 ImageFilter 缓存下来，每次使用缓存的 ImageFilter 防止内存泄露
+final Map<double, ui.ImageFilter> _blurFilterCache = {};
+
+/// 获取缓存的 ImageFilter
+ui.ImageFilter _getBlurFilter(double sigma) {
+  return _blurFilterCache.putIfAbsent(
+    sigma,
+    () => ui.ImageFilter.blur(
+      sigmaX: sigma,
+      sigmaY: sigma,
+      tileMode: TileMode.decal,
+    ),
+  );
 }
 
 class _InterludeWidget extends StatelessWidget {
