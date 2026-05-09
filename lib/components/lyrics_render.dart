@@ -667,11 +667,6 @@ class _StaggeredLyricItem extends StatelessWidget {
         }
       }
 
-      final Widget lyricLine = FractionallySizedBox(
-        widthFactor: 1,
-        child: content,
-      );
-
       return TextButton(
         onPressed: () {
           audioController.audioSetPositon(pos: startTime);
@@ -684,7 +679,6 @@ class _StaggeredLyricItem extends StatelessWidget {
         child:
             settingController.useBlur.value
                 ? ImageFiltered(
-                  enabled: targetSigma > 0,
                   imageFilter: ui.ImageFilter.blur(
                     sigmaX: targetSigma,
                     sigmaY: targetSigma,
@@ -692,7 +686,7 @@ class _StaggeredLyricItem extends StatelessWidget {
                   ),
                   child: RepaintBoundary(child: content),
                 )
-                : lyricLine,
+                : content,
       );
     });
   }

@@ -111,21 +111,19 @@ class PlayBar extends GetView<AudioController> {
         right: rightOffset,
         child: ClipRRect(
           borderRadius: _coverBorderRadius,
-          child: RepaintBoundary(
-            child: Column(
+          child: Column(
               children: [
                 _buildSlider(context, audioCtrlWidget),
                 _buildPlayBarBody(context, audioCtrlWidget),
               ],
             ),
-          ),
         ),
       );
     });
   }
 // 构建 Slider 部分
   Widget _buildSlider(BuildContext context, AudioCtrlWidget audioCtrlWidget) {
-    return Material(
+    return RepaintBoundary(child: Material(
       color: Colors.transparent,
       child: SliderTheme(
         data: SliderTheme.of(context).copyWith(
@@ -159,7 +157,7 @@ class PlayBar extends GetView<AudioController> {
           child: audioCtrlWidget.seekSlide,
         ),
       ),
-    );
+    ),);
   }
 
   // 构建播放条主体部分
@@ -198,7 +196,7 @@ class PlayBar extends GetView<AudioController> {
         // 进度条
         const _ProgressBar(),
         // 交互层
-        TextButton(
+        RepaintBoundary(child: TextButton(
           onPressed: () => Get.toNamed(AppRoutes.lrcView),
           onHover: (v) => _isBarHover.value=v,
           style: TextButton.styleFrom(
@@ -219,7 +217,7 @@ class PlayBar extends GetView<AudioController> {
               _buildTimeDisplay(c,timeTextStyle),
             ],
           ),
-        ),
+        ),),
       ],
     );
   }
@@ -339,7 +337,10 @@ class PlayBar extends GetView<AudioController> {
 
   // 构建时间显示
   Widget _buildTimeDisplay(AudioController c,TextStyle timeTextStyle) {
-    return Obx(() {
+    return SizedBox(
+      height: _barHeight/2,
+      width: 72,
+      child: RepaintBoundary(child: Center(child: Obx(() {
       final duration =
           c.currentDuration.value > 0
               ? formatTime(totalSeconds: c.currentDuration.value)
@@ -348,7 +349,7 @@ class PlayBar extends GetView<AudioController> {
         totalSeconds: c.currentSec.value,
       );
       return Text("$currentSec / $duration", style: timeTextStyle);
-    });
+    }),),),);
   }
 }
 

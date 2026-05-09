@@ -705,7 +705,8 @@ class LrcView extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: context.width * 0.25,
-                    child: Obx(
+                    height: _audioCtrlBarHeight-24, // 固定高度避免重新layout
+                    child: RepaintBoundary(child: Obx(
                       () => Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -725,7 +726,7 @@ class LrcView extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ),
+                    ),),
                   ),
                   Expanded(
                     child: Obx(
